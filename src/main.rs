@@ -1,7 +1,9 @@
-mod rand_n;
-use rand_n::rand_id;
-// mod unit;
-// use unit::load_data;
+//外部引用 dotenv
+extern crate dotenv;
+// 引入sqlx mysql特征 引入dotenv和env 引入axum 引入serde 用于序列化和反序列化
+use sqlx::mysql::MySqlPoolOptions;
+use dotenv::dotenv;
+use std::env;
 use axum::{
     routing::{get, post},
     response::IntoResponse,
@@ -10,67 +12,87 @@ use axum::{
     Router,Json
 };
 use serde::{Deserialize, Serialize};
+use sqlx::{MySql, Pool};
+
+// 引入rand_n 和 unit 模块
+// mod rand_n;
+// use rand_n::rand_id;
+// mod unit;
+// use unit::load_data;
 
 #[tokio::main]
 async fn main() {
-    
+    // 加载.env文件
+    dotenv().ok();
+    // 从环境变量中获取数据库连接地址
+    let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
+    // 连接数据库
+    let pool = MySqlPoolOptions::new()
+        .connect(database_url.as_str())
+        .await
+        .map_err(|e| { println!("error: {}", e);e })?;
+
     // let load_data =load_data().await.unwrap();
     // let length = load_data.len();
     // println!("{:?}",length);
+
     // 构建router
     let app = Router::new()
     .route("/", get(root))  //路径对应handler
-    .route("/getData", post(get_data))
-    .route("/foo", get(get_foo).post(post_foo))
-    .route("/users", post(create_user));
+    .route("/getUser", post(get_user)).layer(pool.clone())
+    .route("/users", post(create_user)).layer(pool.clone());
 
     // 运行hyper  http服务 localhost:3000
     axum::Server::bind(&"0.0.0.0:3000".parse().unwrap())
         .serve(app.into_make_service())
         .await
         .unwrap();
-
 }
 
-// 一个个handler
+// handler对应的函数
 async fn root()-> Html<&'static str> {
     println!("Hello, world!");
-    Html("<p>Hello, World!</p>")
+    Html("<p>Hello, Welcome root!</p>")
 }
-async fn get_foo() {
-    println!("get_foo");
+
+async fn get_user(pool: Pool<MySql>,Json(id): Json<User>)-> impl IntoResponse {
+    // 查询一条数据
+    let user_info = sqlx::query!(r#"SELECT * FROM user_t WHERE id = ?"#,id)
+        .fetch_all(&pool)
+        .await
+        .map_err(|e| { println!("error: {}", e);e })?;
+
+    println!("{:?}", user_info);
+    Ok(StatusCode::CREATED)
 }
-async fn post_foo() {
-    println!("post_foo");
-}
-async fn get_data() {
-    println!("get_data");
-}
-async fn create_user( Json(payload): Json<CreateUser>,) -> impl IntoResponse {
+
+async fn create_user( pool:Pool<MySql>,Json(payload): Json<User>,) -> impl IntoResponse {
     let user = User {
-        id :rand_id(12),
         username: payload.username,
+        address: payload.address,
+        id: None,
     };
-    println!("new User: {}", user);
+    // 插入一条数据
+    let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address) VALUES (?, ?)"#,user.username,user.address)
+        .execute(&pool)
+        .await
+        .map_err(|e| { println!("error: {}", e);e })?;
+    println!("{:?}",new_user);
     (StatusCode::CREATED, Json(user))
 }
 
 
-// 定义一个createUser
-#[derive(Deserialize)]
-struct CreateUser {
-    username: String,
-}
 // 定义一个user 
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 struct User {
-    id: u64,
     username: String,
+    address: String,
+    id: Option<i32>,
 }
 
 impl std::fmt::Display for User {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, " {{ id: {}, username: {} }}", self.id, self.username)
+        write!(f, " {{ address: {}, username: {},id：{:?} }}", self.address, self.username,self.id)
     }
 }
 
