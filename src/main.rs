@@ -9,6 +9,7 @@ use axum::{
     response::IntoResponse,
     response::Html,
     http::StatusCode,
+    extract::Path,
     Router,Json
 };
 use serde::{Deserialize, Serialize};
@@ -39,7 +40,7 @@ async fn main() {
     // 构建router
     let app = Router::new()
     .route("/", get(root))  //路径对应handler
-    .route("/getUser", post(get_user)).layer(pool.clone())
+    .route("/getUser/:id", get(get_user)).layer(pool.clone())
     .route("/users", post(create_user)).layer(pool.clone());
 
     // 运行hyper  http服务 localhost:3000
@@ -55,15 +56,16 @@ async fn root()-> Html<&'static str> {
     Html("<p>Hello, Welcome root!</p>")
 }
 
-async fn get_user(pool: Pool<MySql>,Json(id): Json<User>)-> impl IntoResponse {
+async fn get_user(pool: Pool<MySql>,Path(user_id): Path<u32>)-> String  {
     // 查询一条数据
+    let id = user_id ;
     let user_info = sqlx::query!(r#"SELECT * FROM user_t WHERE id = ?"#,id)
         .fetch_all(&pool)
         .await
         .map_err(|e| { println!("error: {}", e);e })?;
 
     println!("{:?}", user_info);
-    Ok(StatusCode::CREATED)
+    format!("Hello, Welcome get_user!{:?}",user_info)
 }
 
 async fn create_user( pool:Pool<MySql>,Json(payload): Json<User>,) -> impl IntoResponse {
@@ -83,16 +85,9 @@ async fn create_user( pool:Pool<MySql>,Json(payload): Json<User>,) -> impl IntoR
 
 
 // 定义一个user 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct User {
     username: String,
     address: String,
     id: Option<i32>,
 }
-
-impl std::fmt::Display for User {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, " {{ address: {}, username: {},id：{:?} }}", self.address, self.username,self.id)
-    }
-}
-
