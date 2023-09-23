@@ -21,27 +21,17 @@ use serde::{Deserialize, Serialize};
 // mod rand_n;
 // use rand_n::rand_id;
 mod unit;
-mod error;
 mod response;
-
 pub use response::Response;
-use crate::error::{AppError, AppErrorType};
 
-type Result<T> = std::result::Result<T, AppError>;
-
-async fn get_client() -> Result<Pool<MySql>> {
+async fn get_client() -> Result<Pool<MySql>, sqlx::Error> {
     // 从环境变量中获取数据库连接地址
     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
     // 连接数据库
     let pool = MySqlPoolOptions::new()
         .max_connections(10)
         .connect(database_url.as_str())
-        .await
-        .map_err(|err| AppError {
-            message: Some(err.to_string()),
-            cause: None,
-            error_type: AppErrorType::DbType, // You can choose the appropriate error type here
-        })?;
+        .await?;
     // 返回连接池
     Ok(pool)
 }
@@ -69,11 +59,12 @@ async fn main() {
 
 // handler对应的函数
 async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
-    let pool = match get_client().await {
-        Ok(pool) => pool,
-        Err(err) => {
-            return err.into_response();
-        }
+    let pool =match get_client().await {
+            Ok(pool) => pool,
+            Err(e) => {
+                println!("error: {}", e);
+                return Json(Response::err(500, "not found".to_string()));
+            }
     };
 
     // 查询一条数据
@@ -85,7 +76,6 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
             println!("error: {}", e);
             e
         });
-
     match user_info {
         Ok(Some(user)) => {
             let info = User {
@@ -97,6 +87,7 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
         }
         _ => Json(Response::err(500, "not found".to_string())),
     }
+
 }
 
 
@@ -119,7 +110,7 @@ async fn create_user(Json(payload): Json<User>) -> impl IntoResponse {
             e
         });
     println!("{:?}", new_user);
-    (Json(Response::ok(user)))
+    Json(Response::ok(user))
 }
 
 
