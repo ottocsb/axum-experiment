@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use std::error::Error as StdError;
 use std::fs::read_to_string;
 
-pub async fn load_data() -> Result<Vec<Vec<String>>, Box<dyn StdError>> {
+pub async fn _load_data() -> Result<Vec<Vec<String>>, Box<dyn StdError>> {
     let file_name = "users.xlsx";
     let mut excel: Xlsx<_> = open_workbook(file_name)?;
 
@@ -22,7 +22,7 @@ pub async fn load_data() -> Result<Vec<Vec<String>>, Box<dyn StdError>> {
         data.shuffle(&mut rng);
     }
 
-    let cache_data = load_temp_data().await;
+    let cache_data = _load_temp_data().await;
     println!("{:?}", cache_data);
     if cache_data.is_empty() || cache_data.iter().any(|s| s.is_empty()) {
         // 执行一些操作
@@ -32,7 +32,7 @@ pub async fn load_data() -> Result<Vec<Vec<String>>, Box<dyn StdError>> {
 }
 
 
-async fn load_temp_data() -> Vec<String> {
+async fn _load_temp_data() -> Vec<String> {
     let mut pros = vec![];
 
     let temp_json = {

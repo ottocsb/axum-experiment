@@ -68,8 +68,7 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
     };
 
     // 查询一条数据
-    let id = user_id;
-    let user_info = sqlx::query!(r#"SELECT * FROM user_t WHERE id = ?"#, id)
+    let user_info = sqlx::query!(r#"SELECT * FROM user_t WHERE id = ?"#, user_id)
         .fetch_optional(&pool)
         .await
         .map_err(|e| {
