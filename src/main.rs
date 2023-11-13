@@ -16,12 +16,14 @@ use sqlx::{
 };
 
 use serde::{Deserialize, Serialize};
+use sqlx::types::chrono;
 
 // 引入rand_n 和 unit 模块
 // mod rand_n;
 // use rand_n::rand_id;
 mod unit;
 mod response;
+
 pub use response::Response;
 
 async fn get_client() -> Result<Pool<MySql>, sqlx::Error> {
@@ -59,12 +61,12 @@ async fn main() {
 
 // handler对应的函数
 async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
-    let pool =match get_client().await {
-            Ok(pool) => pool,
-            Err(e) => {
-                println!("error: {}", e);
-                return Json(Response::err(500, "not found".to_string()));
-            }
+    let pool = match get_client().await {
+        Ok(pool) => pool,
+        Err(e) => {
+            println!("error: {}", e);
+            return Json(Response::err(500, "not found".to_string()));
+        }
     };
 
     // 查询一条数据
@@ -81,27 +83,27 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
                 username: user.name,
                 address: user.address,
                 id: Some(user.id),
+                creation_time: None,
             };
             Json(Response::ok(info))
         }
         _ => Json(Response::err(500, "not found".to_string())),
     }
-
 }
 
 
-async fn create_user(Json(payload): Json<User>) -> impl IntoResponse {
+async fn create_user(Json(mut payload): Json<User>) -> impl IntoResponse {
     let pool = get_client()
         .await
         .unwrap();
 
-    let user = User {
-        username: payload.username,
-        address: payload.address,
-        id: None,
-    };
+    // 获取当前时间 用于创建时间
+    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    payload.creation_time = Some(now.clone());
+    let user = User::new(payload.username, payload.address, payload.creation_time);
+
     // 插入一条数据
-    let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address) VALUES (?, ?)"#,user.username,user.address)
+    let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address, creationTime) VALUES (?, ?, ?)"#,user.username,user.address,user.creation_time)
         .execute(&pool)
         .await
         .map_err(|e| {
@@ -119,4 +121,19 @@ struct User {
     username: Option<String>,
     address: Option<String>,
     id: Option<i32>,
+    creation_time: Option<String>,
 }
+
+// 在User实现newUser方法方便生成实例
+impl User {
+    fn new(username: Option<String>, address: Option<String>, creation_time: Option<String>) -> Self {
+        Self {
+            username,
+            address,
+            id: None,
+            creation_time,
+        }
+    }
+}
+// 给出调用示例
+// let user = User::new(Some("张三".to_string()), Some("北京".to_string()));
