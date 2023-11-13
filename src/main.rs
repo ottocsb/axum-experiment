@@ -92,15 +92,11 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
 }
 
 
-async fn create_user(Json(mut payload): Json<User>) -> impl IntoResponse {
+async fn create_user(Json( payload): Json<User>) -> impl IntoResponse {
     let pool = get_client()
         .await
         .unwrap();
-
-    // 获取当前时间 用于创建时间
-    let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
-    payload.creation_time = Some(now.clone());
-    let user = User::new(payload.username, payload.address, payload.creation_time);
+    let user = User::new(payload.username, payload.address);
 
     // 插入一条数据
     let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address, creationTime) VALUES (?, ?, ?)"#,user.username,user.address,user.creation_time)
@@ -126,12 +122,14 @@ struct User {
 
 // 在User实现newUser方法方便生成实例
 impl User {
-    fn new(username: Option<String>, address: Option<String>, creation_time: Option<String>) -> Self {
+    fn new(username: Option<String>, address: Option<String>) -> Self {
+        // 获取当前时间 用于创建时间
+        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         Self {
             username,
             address,
             id: None,
-            creation_time,
+            creation_time:Some(now),
         }
     }
 }
