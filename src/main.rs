@@ -17,7 +17,7 @@ use sqlx::{
 
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono;
-use chrono::{DateTime, Utc};
+use chrono::{NaiveDateTime};
 // 引入rand_n 和 unit 模块
 // mod rand_n;
 // use rand_n::rand_id;
@@ -35,6 +35,7 @@ async fn get_client() -> Result<Pool<MySql>, sqlx::Error> {
         .connect(database_url.as_str())
         .await?;
     // 返回连接池
+    // 链接成功打印一条日志
     Ok(pool)
 }
 
@@ -118,18 +119,19 @@ struct User {
     username: Option<String>,
     address: Option<String>,
     id: Option<i32>,
-    created_at: DateTime<Utc>,
+    created_at: Option<NaiveDateTime>,
 }
 
 // 在User实现newUser方法方便生成实例
 impl User {
     fn new(username: Option<String>, address: Option<String>) -> Self {
         // 获取当前时间 用于创建时间
+        let now=chrono::Local::now();
         Self {
             username,
             address,
             id: None,
-            created_at:Utc::now(),
+            created_at:Some(now.naive_local()),
         }
     }
 }

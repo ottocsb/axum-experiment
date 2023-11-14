@@ -15,3 +15,4 @@ serde_json = "1.0.108"
 rand="0.8.5"
 calamine = "0.22.1"
 dotenv = "0.15.0"
+chrono = { version = "0.4.31", features = ["serde"] }
