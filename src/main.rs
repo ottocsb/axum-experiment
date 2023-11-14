@@ -17,7 +17,7 @@ use sqlx::{
 
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono;
-
+use chrono::{DateTime, Utc};
 // 引入rand_n 和 unit 模块
 // mod rand_n;
 // use rand_n::rand_id;
@@ -70,7 +70,7 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
     };
 
     // 查询一条数据
-    let user_info = sqlx::query!(r#"SELECT * FROM user_t WHERE id = ?"#, user_id)
+    let user_info = sqlx::query!(r#"SELECT id, name, address, created_at  FROM user_t WHERE id = ?"#, user_id)
         .fetch_optional(&pool)
         .await
         .map_err(|e| {
@@ -79,11 +79,12 @@ async fn get_user(Path(user_id): Path<u32>) -> impl IntoResponse {
         });
     match user_info {
         Ok(Some(user)) => {
+            println!("{:?}", user);
             let info = User {
                 username: user.name,
                 address: user.address,
                 id: Some(user.id),
-                creation_time: None,
+                created_at: user.created_at,
             };
             Json(Response::ok(info))
         }
@@ -99,7 +100,7 @@ async fn create_user(Json( payload): Json<User>) -> impl IntoResponse {
     let user = User::new(payload.username, payload.address);
 
     // 插入一条数据
-    let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address, creationTime) VALUES (?, ?, ?)"#,user.username,user.address,user.creation_time)
+    let new_user = sqlx::query!(r#"INSERT INTO user_t (name, address, created_at) VALUES (?, ?, ?)"#,user.username,user.address,user.created_at)
         .execute(&pool)
         .await
         .map_err(|e| {
@@ -111,25 +112,24 @@ async fn create_user(Json( payload): Json<User>) -> impl IntoResponse {
 }
 
 
-// 定义一个user 
-#[derive(Serialize, Deserialize, Debug)]
+// 定义一个user 待实现创建时间的自动赋值 主要是DateTime<Utc>类型的赋值与序列化问题
+#[derive(Debug, Serialize, Deserialize)]
 struct User {
     username: Option<String>,
     address: Option<String>,
     id: Option<i32>,
-    creation_time: Option<String>,
+    created_at: DateTime<Utc>,
 }
 
 // 在User实现newUser方法方便生成实例
 impl User {
     fn new(username: Option<String>, address: Option<String>) -> Self {
         // 获取当前时间 用于创建时间
-        let now = chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
         Self {
             username,
             address,
             id: None,
-            creation_time:Some(now),
+            created_at:Utc::now(),
         }
     }
 }
